@@ -5,6 +5,42 @@ Esta guía detalla la preparación del sistema operativo, la configuración de s
 ## 1. Arquitectura del Sistema
 Antes de entrar a los comandos, es vital entender cómo interactúan los componentes que estás configurando:
 
+```mermaid
+graph TB
+
+    subgraph Host ["🌐 MicroOS Host (User: adrian)"]
+        direction TB
+        
+        subgraph Podman ["📦 Podman Runtime"]
+            direction LR
+            
+            subgraph CTR_DIR ["🎩 Container: Bacula-Director-Web"]
+                B_WEB["🖥️ Bacularis API/Web<br/>(Port: 9097)"]
+                B_DIR["🧠 Bacula Director<br/>(Port: 9101)"]
+                B_WEB -.->|"Local Socket / Files"| B_DIR
+            end
+
+            B_DB[("🗄️ Database<br/>(PostgreSQL/MariaDB)")]
+            B_SD["💾 Bacula Storage<br/>(Port: 9103)"]
+        end
+    end
+
+    %% Flujos de Red
+    ADMIN["👨‍💻 Administrador"] -- "HTTP (9097)" --> B_WEB
+    B_DIR <-->|"Catálogo"| B_DB
+    B_DIR <-->|"Control de Medios"| B_SD
+
+    %% Clientes
+    CLIENT["🖥️ Cliente Externo (FD)"] -- "1. Comandos (9101)" --> B_DIR
+    CLIENT -- "2. Datos (9103)" --> B_SD
+
+    %% Aplicación de Estilos
+    class Host host;
+    class CTR_DIR mainContainer;
+    class B_DB,B_SD secondaryContainer;
+    class ADMIN,CLIENT external;
+```
+
 ### 1.2. Preparación del Sistema Operativo (Host)
 Dado que usas **openSUSE MicroOS**, todas las modificaciones al sistema de archivos raíz deben ser atómicas y requieren un reinicio para aplicarse.
 
