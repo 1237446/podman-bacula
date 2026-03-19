@@ -1,0 +1,20 @@
+[Unit]
+Description=Bacula Database Service (Postgres)
+
+[Container]
+Image=postgres:17-alpine
+ContainerName=bacula-database
+Environment=POSTGRES_DB=bacula
+Environment=POSTGRES_USER=bacula
+Environment=POSTGRES_INITDB_ARGS=--encoding=SQL_ASCII
+Environment=TZ=America/Lima
+Environment=POSTGRES_PASSWORD=R7CZ3d4ZRqW7i4ddr5MSiwONohkhVFM0HMCHx8ytkP78b8LXXt
+Volume=%h/bacula/init-db:/docker-entrypoint-initdb.d:Z
+Volume=postgres_data:/var/lib/postgresql/data:Z
+Network=bacularis.network
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
