@@ -1,0 +1,82 @@
+FROM ubuntu:22.04 AS base_config
+
+ENV DEBIAN_FRONTEND=noninteractive
+ARG REPO_ID=5cee4d079821e
+ENV BACULA_VERSION=15.0.2
+
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates curl gnupg2 dbconfig-common apt-transport-https ssl-cert && \
+    # ELIMINACIÓN DE SECRETOS (Snakeoil)
+    rm -f /etc/ssl/private/ssl-cert-snakeoil.key /etc/ssl/certs/ssl-cert-snakeoil.pem && \
+    apt-get purge -y ssl-cert && \
+    # Configuración de Repositorio de Bacula
+    install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://bacula.org/downloads/Bacula-4096-Distribution-Verification-key.asc | \
+    gpg --dearmor -o /etc/apt/keyrings/bacula-archive-keyring.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/bacula-archive-keyring.gpg] https://www.bacula.org/packages/${REPO_ID}/debs/${BACULA_VERSION} jammy main" \
+    > /etc/apt/sources.list.d/bacula-community.list && \
+    apt-get update
+
+FROM base_config AS builder
+
+RUN apt-get install -y --no-install-recommends \
+    bacula-postgresql \
+    bacula-cloud-storage-common \
+    bacula-cloud-storage-s3 \
+    bacula-aligned && \
+    # Limpieza de seguridad en la etapa intermedia
+    rm -rf /etc/ssl/private/ssl-cert-snakeoil.key
+
+# ==========================================
+# ETAPA 3: Imagen Final (Producción UNI)
+# ==========================================
+FROM ubuntu:22.04
+
+LABEL maintainer="Adrian - UNI Support"
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 1. Importar identidad del usuario bacula y configuración de repos
+# (Copiamos passwd/group para que el usuario bacula exista en la etapa final)
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
+COPY --from=builder /etc/shadow /etc/shadow
+COPY --from=builder /etc/apt/keyrings /etc/apt/keyrings
+COPY --from=builder /etc/apt/sources.list.d/bacula-community.list /etc/apt/sources.list.d/bacula-community.list
+
+# 2. Copiar binarios y librerías de Bacula
+COPY --from=builder /opt/bacula /opt/bacula
+COPY --from=builder /usr/lib /usr/lib
+COPY --from=builder /lib /lib
+COPY --from=builder /usr/bin /usr/bin
+
+# 3. Hardening: Eliminación de binarios de administración vulnerables
+RUN rm -f /usr/bin/chfn /usr/bin/chsh /usr/bin/gpasswd /usr/bin/expiry /usr/bin/chage && \
+    # 4. Configuración de enlaces y permisos
+    for i in /opt/bacula/bin/*; do \
+        filename=$(basename $i); \
+        if [ ! -e /usr/sbin/$filename ]; then \
+            ln -s $i /usr/sbin/$filename; \
+        fi; \
+    done && \
+    mkdir -p /opt/bacula/working /opt/bacula/etc && \
+    chown -R bacula:bacula /opt/bacula
+
+COPY ./bacula/etc/bacula-sd.conf /opt/bacula/etc/bacula-sd.conf
+
+# Ejecutamos estas tareas como ROOT para poder usar chown y crear carpetas
+RUN chown bacula:bacula /opt/bacula/etc/bacula-sd.conf && \
+    chmod 660 /opt/bacula/etc/bacula-sd.conf && \
+    # Ajustamos la ruta para que coincida con bacula-sd.conf (/opt/bacula/working)
+    mkdir -p /opt/bacula/working/cache && \
+    # Damos permisos al usuario bacula sobre toda su área de trabajo
+    chown -R bacula:bacula /opt/bacula/working && \
+    chmod -R 775 /opt/bacula/working
+
+EXPOSE 9103/tcp
+
+# Ahora sí, cambiamos al usuario limitado
+USER bacula
+
+ENTRYPOINT ["/opt/bacula/bin/bacula-sd"]
+CMD ["-f", "-c", "/opt/bacula/etc/bacula-sd.conf"]
