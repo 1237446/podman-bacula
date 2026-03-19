@@ -1,0 +1,28 @@
+[Unit]
+Description=Bacula Director and Web Panel
+After=bacula-database.service
+Requires=bacula-database.service
+
+[Container]
+Image=bacula-director:test-1
+ContainerName=bacula-director
+AddHost=apu.uni.edu.pe:172.16.9.184
+PublishPort=9097:9097
+PublishPort=9101:9101
+PublishPort=9102:9102
+Environment=TZ=America/Lima
+Volume=bacula_director_config:/etc/bacula:Z
+Volume=bacula_director_working:/var/lib/bacula:Z
+Volume=bacularis_api_director_config:/var/www/bacularis/protected/vendor/bacularis/bacularis-api/API/Config:Z
+Volume=bacularis_api_director_logs:/var/www/bacularis/protected/vendor/bacularis/bacularis-api/API/Logs:Z
+Volume=bacularis_web_director_config:/var/www/bacularis/protected/vendor/bacularis/bacularis-web/Web/Config:Z
+Volume=bacularis_web_director_logs:/var/www/bacularis/protected/vendor/bacularis/bacularis-web/Web/Logs:Z
+Volume=bacularis_director_working:/var/www/bacularis/protected/vendor/bacularis/bacularis-common/Common/Working:Z
+Network=bacularis.network
+HealthCmd=nc -z 127.0.0.1 9097
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.targe
