@@ -1,0 +1,21 @@
+[Unit]
+Description=Bacula Storage Daemon (S3)
+After=bacula-database.service
+Requires=bacula-database.service
+
+[Container]
+Image=bacula-storage:test-1
+ContainerName=bacula-storage
+PublishPort=9103:9103
+UserNS=keep-id
+Environment=TZ=America/Lima
+Volume=bacula_sd_config:/opt/bacula/etc:Z
+Volume=%h/bacula/bacula_sd_working:/opt/bacula/working:Z
+Network=bacularis.network
+HealthCmd=cat /proc/net/tcp | grep 238F
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
