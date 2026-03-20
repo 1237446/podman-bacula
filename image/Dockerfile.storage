@@ -29,7 +29,7 @@ RUN apt-get install -y --no-install-recommends \
     rm -rf /etc/ssl/private/ssl-cert-snakeoil.key
 
 # ==========================================
-# ETAPA 3: Imagen Final (Producción UNI)
+# ETAPA 3: Imagen Final
 # ==========================================
 FROM ubuntu:22.04
 
